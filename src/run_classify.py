@@ -90,7 +90,7 @@ def set_seed(args):
 def train(args, train_dataset, model, tokenizer, lang2id=None):
     """Train the model."""
     if args.local_rank in [-1, 0]:
-        tb_writer = SummaryWriter()
+        tb_writer = SummaryWriter(log_dir=os.path.join(args.output_dir, "tb_logs"))
 
     args.train_batch_size = args.per_gpu_train_batch_size * max(1, args.n_gpu)
     train_sampler = RandomSampler(
@@ -855,7 +855,7 @@ def main():
             logging.FileHandler(os.path.join(args.output_dir, args.log_file)),
             logging.StreamHandler()
         ],
-        format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
+        format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
         datefmt='%m/%d/%Y %H:%M:%S',
         level=logging.INFO if args.local_rank in [-1, 0] else logging.WARN)
     logging.info("Input args: %r" % args)
