@@ -975,25 +975,27 @@ def main():
 
     # Saving best-practices: if you use defaults names for the model, you can reload it using from_pretrained()
     if args.do_train and (args.local_rank == -1
-                          or torch.distributed.get_rank() == 0):
+                          or torch.distributed.get_rank()
+                          == 0):
         # Create output directory if needed
-        if not os.path.exists(args.output_dir) and args.local_rank in [-1, 0]:
-            os.makedirs(args.output_dir)
+        output_dir = os.path.join(args.output_dir, "checkpoint-training-end")
+        if not os.path.exists(output_dir) and args.local_rank in [-1, 0]:
+            os.makedirs(output_dir)
 
-        logger.info("Saving model checkpoint to %s", args.output_dir)
+        logger.info("Saving model checkpoint to %s", output_dir)
         # Save a trained model, configuration and tokenizer using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
         model_to_save = (model.module if hasattr(model, "module") else model
                          )  # Take care of distributed/parallel training
-        model_to_save.save_pretrained(args.output_dir)
-        tokenizer.save_pretrained(args.output_dir)
+        model_to_save.save_pretrained(output_dir)
+        tokenizer.save_pretrained(output_dir)
 
         # Good practice: save your training arguments together with the trained model
-        torch.save(args, os.path.join(args.output_dir, "training_args.bin"))
+        torch.save(args, os.path.join(output_dir, "training_args.bin"))
 
         # Load a trained model and vocabulary that you have fine-tuned
-        model = model_class.from_pretrained(args.output_dir)
-        tokenizer = tokenizer_class.from_pretrained(args.output_dir)
+        model = model_class.from_pretrained(output_dir)
+        tokenizer = tokenizer_class.from_pretrained(output_dir)
         model.to(args.device)
 
     # Evaluation
@@ -1003,7 +1005,7 @@ def main():
     elif os.path.exists(os.path.join(args.output_dir, 'checkpoint-best')):
         best_checkpoint = os.path.join(args.output_dir, 'checkpoint-best')
     else:
-        best_checkpoint = args.output_dir
+        best_checkpoint = os.path.join(args.output_dir, "checkpoint-training-end")
     best_score = 0
     if args.do_eval and args.local_rank in [-1, 0]:
         tokenizer = tokenizer_class.from_pretrained(
@@ -1109,7 +1111,6 @@ def main():
                 total += result['num']
                 total_correct += result['correct']
             writer.write('total={}\n'.format(total_correct / total))
-
     return result
 
 
