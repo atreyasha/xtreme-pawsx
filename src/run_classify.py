@@ -22,12 +22,12 @@ from torch.utils.data import DataLoader, TensorDataset
 from torch.utils.data import RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
 import argparse
-import glob
 import logging
-import os
-import random
 import numpy as np
+import random
+import glob
 import torch
+import os
 from tqdm import tqdm, trange
 
 from transformers import (
@@ -90,7 +90,11 @@ def set_seed(args):
 def train(args, train_dataset, model, tokenizer, lang2id=None):
     """Train the model."""
     if args.local_rank in [-1, 0]:
-        tb_writer = SummaryWriter(log_dir=os.path.join(args.output_dir, "tb_logs"))
+        tb_train = SummaryWriter(
+            log_dir=os.path.join(args.output_dir, "train"))
+        if args.save_only_best_checkpoint:
+            tb_valid = SummaryWriter(
+                log_dir=os.path.join(args.output_dir, "valid"))
 
     args.train_batch_size = args.per_gpu_train_batch_size * max(1, args.n_gpu)
     train_sampler = RandomSampler(
@@ -270,10 +274,10 @@ def train(args, train_dataset, model, tokenizer, lang2id=None):
                         -1, 0
                 ] and args.logging_steps > 0 and global_step % args.logging_steps == 0:
                     # Log metrics
-                    tb_writer.add_scalar("lr",
-                                         scheduler.get_lr()[0], global_step)
-                    tb_writer.add_scalar("loss", (tr_loss - logging_loss) /
-                                         args.logging_steps, global_step)
+                    tb_train.add_scalar("lr",
+                                        scheduler.get_lr()[0], global_step)
+                    tb_train.add_scalar("loss", (tr_loss - logging_loss) /
+                                        args.logging_steps, global_step)
                     logging_loss = tr_loss
 
                     # Only evaluate on single GPU otherwise metrics may not average well
@@ -286,8 +290,8 @@ def train(args, train_dataset, model, tokenizer, lang2id=None):
                                            language=args.train_language,
                                            lang2id=lang2id)
                         for key, value in results.items():
-                            tb_writer.add_scalar("eval_{}".format(key), value,
-                                                 global_step)
+                            tb_train.add_scalar("eval_{}".format(key), value,
+                                                global_step)
 
                 if args.local_rank in [
                         -1, 0
@@ -324,6 +328,9 @@ def train(args, train_dataset, model, tokenizer, lang2id=None):
                                           language=args.train_language,
                                           lang2id=lang2id,
                                           prefix=str(global_step))
+                        for key, value in result.items():
+                            tb_valid.add_scalar("eval_{}".format(key), value,
+                                                global_step)
                         logger.info(" Dev accuracy {} = {}".format(
                             args.train_language, result['acc']))
                         if result['acc'] > best_score:
@@ -394,7 +401,9 @@ def train(args, train_dataset, model, tokenizer, lang2id=None):
             break
 
     if args.local_rank in [-1, 0]:
-        tb_writer.close()
+        tb_train.close()
+        if args.save_only_best_checkpoint:
+            tb_valid.close()
 
     return global_step, tr_loss / global_step, best_score, best_checkpoint
 
