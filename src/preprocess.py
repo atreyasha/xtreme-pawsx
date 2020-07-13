@@ -49,7 +49,7 @@ def pawsx_preprocess(args):
             outfile = os.path.join(args.output_dir,
                                    "{}-{}.tsv".format(split, lang))
             _preprocess_one_file(infile, outfile)
-            print(f'finish preprocessing {outfile}')
+            print(f'finished preprocessing {outfile}')
 
 
 if __name__ == "__main__":
