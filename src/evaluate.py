@@ -15,7 +15,7 @@
 # limitations under the License.
 """Evaluation."""
 
-from .arg_metav_formatter import arg_metav_formatter
+from ..arg_metav_formatter import arg_metav_formatter
 from seqeval.metrics import precision_score, recall_score, f1_score
 from collections import defaultdict
 import os

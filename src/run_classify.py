@@ -17,7 +17,7 @@
 # limitations under the License.
 """ Finetuning multi-lingual models on XNLI/PAWSX (Bert, XLM, XLMRoberta)."""
 
-from .arg_metav_formatter import arg_metav_formatter
+from ..arg_metav_formatter import arg_metav_formatter
 from torch.utils.data import DataLoader, TensorDataset
 from torch.utils.data import RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler

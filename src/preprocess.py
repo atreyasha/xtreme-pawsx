@@ -15,7 +15,7 @@
 # limitations under the License.
 
 from __future__ import absolute_import, division, print_function
-from .arg_metav_formatter import arg_metav_formatter
+from ..arg_metav_formatter import arg_metav_formatter
 import argparse
 import os
 import csv
