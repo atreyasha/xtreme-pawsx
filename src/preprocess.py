@@ -42,6 +42,8 @@ def pawsx_preprocess(args):
     split2file = {'train': 'train', 'test': 'test_2k', 'dev': 'dev_2k'}
     for lang in ['en', 'de', 'es', 'fr', 'ja', 'ko', 'zh']:
         for split in ['train', 'test', 'dev']:
+            if split == 'train' and lang != 'en':
+                continue
             file = split2file[split]
             infile = os.path.join(args.data_dir, lang, "{}.tsv".format(file))
             outfile = os.path.join(args.output_dir,
