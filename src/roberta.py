@@ -1,5 +1,7 @@
-# coding=utf-8
-# Copyright 2018 The Google AI Language Team Authors, and The HuggingFace Inc. team.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Copyright 2018 The Google AI Language Team Authors,
+# and The HuggingFace Inc. team.
 # Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,81 +17,92 @@
 # limitations under the License.
 """PyTorch RoBERTa model. """
 
-
 import logging
-
 import torch
 import torch.nn as nn
 from torch.nn import CrossEntropyLoss, MSELoss
-
 from transformers.configuration_roberta import RobertaConfig
 from transformers.file_utils import add_start_docstrings
 from transformers.modeling_bert import BertEmbeddings, BertLayerNorm, BertModel, BertPreTrainedModel, gelu
-
-
 logger = logging.getLogger(__name__)
 
 ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP = {
-  "roberta-base": "https://s3.amazonaws.com/models.huggingface.co/bert/roberta-base-pytorch_model.bin",
-  "roberta-large": "https://s3.amazonaws.com/models.huggingface.co/bert/roberta-large-pytorch_model.bin",
-  "roberta-large-mnli": "https://s3.amazonaws.com/models.huggingface.co/bert/roberta-large-mnli-pytorch_model.bin",
-  "distilroberta-base": "https://s3.amazonaws.com/models.huggingface.co/bert/distilroberta-base-pytorch_model.bin",
-  "roberta-base-openai-detector": "https://s3.amazonaws.com/models.huggingface.co/bert/roberta-base-openai-detector-pytorch_model.bin",
-  "roberta-large-openai-detector": "https://s3.amazonaws.com/models.huggingface.co/bert/roberta-large-openai-detector-pytorch_model.bin",
+    "roberta-base":
+    "https://s3.amazonaws.com/models.huggingface.co/bert/roberta-base-pytorch_model.bin",
+    "roberta-large":
+    "https://s3.amazonaws.com/models.huggingface.co/bert/roberta-large-pytorch_model.bin",
+    "roberta-large-mnli":
+    "https://s3.amazonaws.com/models.huggingface.co/bert/roberta-large-mnli-pytorch_model.bin",
+    "distilroberta-base":
+    "https://s3.amazonaws.com/models.huggingface.co/bert/distilroberta-base-pytorch_model.bin",
+    "roberta-base-openai-detector":
+    "https://s3.amazonaws.com/models.huggingface.co/bert/roberta-base-openai-detector-pytorch_model.bin",
+    "roberta-large-openai-detector":
+    "https://s3.amazonaws.com/models.huggingface.co/bert/roberta-large-openai-detector-pytorch_model.bin",
 }
 
 
 class RobertaEmbeddings(BertEmbeddings):
-  """
+    """
   Same as BertEmbeddings with a tiny tweak for positional embeddings indexing.
   """
+    def __init__(self, config):
+        super(RobertaEmbeddings, self).__init__(config)
+        self.padding_idx = 1
+        self.word_embeddings = nn.Embedding(config.vocab_size,
+                                            config.hidden_size,
+                                            padding_idx=self.padding_idx)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings,
+                                                config.hidden_size,
+                                                padding_idx=self.padding_idx)
 
-  def __init__(self, config):
-    super(RobertaEmbeddings, self).__init__(config)
-    self.padding_idx = 1
-    self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=self.padding_idx)
-    self.position_embeddings = nn.Embedding(
-        config.max_position_embeddings, config.hidden_size, padding_idx=self.padding_idx
-    )
+    def forward(self,
+                input_ids=None,
+                token_type_ids=None,
+                position_ids=None,
+                inputs_embeds=None):
+        if position_ids is None:
+            if input_ids is not None:
+                # Create the position ids from the input token ids. Any padded tokens remain padded.
+                position_ids = self.create_position_ids_from_input_ids(
+                    input_ids).to(input_ids.device)
+            else:
+                position_ids = self.create_position_ids_from_inputs_embeds(
+                    inputs_embeds)
 
-  def forward(self, input_ids=None, token_type_ids=None, position_ids=None, inputs_embeds=None):
-    if position_ids is None:
-      if input_ids is not None:
-        # Create the position ids from the input token ids. Any padded tokens remain padded.
-        position_ids = self.create_position_ids_from_input_ids(input_ids).to(input_ids.device)
-      else:
-        position_ids = self.create_position_ids_from_inputs_embeds(inputs_embeds)
+        return super(RobertaEmbeddings,
+                     self).forward(input_ids,
+                                   token_type_ids=token_type_ids,
+                                   position_ids=position_ids,
+                                   inputs_embeds=inputs_embeds)
 
-    return super(RobertaEmbeddings, self).forward(
-        input_ids, token_type_ids=token_type_ids, position_ids=position_ids, inputs_embeds=inputs_embeds
-    )
-
-  def create_position_ids_from_input_ids(self, x):
-    """ Replace non-padding symbols with their position numbers. Position numbers begin at
+    def create_position_ids_from_input_ids(self, x):
+        """ Replace non-padding symbols with their position numbers. Position numbers begin at
     padding_idx+1. Padding symbols are ignored. This is modified from fairseq's
     `utils.make_positions`.
 
     :param torch.Tensor x:
     :return torch.Tensor:
     """
-    mask = x.ne(self.padding_idx).long()
-    incremental_indicies = torch.cumsum(mask, dim=1) * mask
-    return incremental_indicies + self.padding_idx
+        mask = x.ne(self.padding_idx).long()
+        incremental_indicies = torch.cumsum(mask, dim=1) * mask
+        return incremental_indicies + self.padding_idx
 
-  def create_position_ids_from_inputs_embeds(self, inputs_embeds):
-    """ We are provided embeddings directly. We cannot infer which are padded so just generate
+    def create_position_ids_from_inputs_embeds(self, inputs_embeds):
+        """ We are provided embeddings directly. We cannot infer which are padded so just generate
     sequential position ids.
 
     :param torch.Tensor inputs_embeds:
     :return torch.Tensor:
     """
-    input_shape = inputs_embeds.size()[:-1]
-    sequence_length = input_shape[1]
+        input_shape = inputs_embeds.size()[:-1]
+        sequence_length = input_shape[1]
 
-    position_ids = torch.arange(
-        self.padding_idx + 1, sequence_length + self.padding_idx + 1, dtype=torch.long, device=inputs_embeds.device
-    )
-    return position_ids.unsqueeze(0).expand(input_shape)
+        position_ids = torch.arange(self.padding_idx + 1,
+                                    sequence_length + self.padding_idx + 1,
+                                    dtype=torch.long,
+                                    device=inputs_embeds.device)
+        return position_ids.unsqueeze(0).expand(input_shape)
 
 
 ROBERTA_START_DOCSTRING = r"""    The RoBERTa model was proposed in
@@ -171,7 +184,7 @@ ROBERTA_INPUTS_DOCSTRING = r"""
     ROBERTA_INPUTS_DOCSTRING,
 )
 class RobertaModel(BertModel):
-  r"""
+    r"""
   Outputs: `Tuple` comprising various elements depending on the configuration (config) and inputs:
       **last_hidden_state**: ``torch.FloatTensor`` of shape ``(batch_size, sequence_length, hidden_size)``
           Sequence of hidden-states at the output of the last layer of the model.
@@ -199,28 +212,28 @@ class RobertaModel(BertModel):
       last_hidden_states = outputs[0]  # The last hidden-state is the first element of the output tuple
 
   """
-  config_class = RobertaConfig
-  pretrained_model_archive_map = ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
-  base_model_prefix = "roberta"
+    config_class = RobertaConfig
+    pretrained_model_archive_map = ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
+    base_model_prefix = "roberta"
 
-  def __init__(self, config):
-    super(RobertaModel, self).__init__(config)
+    def __init__(self, config):
+        super(RobertaModel, self).__init__(config)
 
-    self.embeddings = RobertaEmbeddings(config)
-    self.init_weights()
+        self.embeddings = RobertaEmbeddings(config)
+        self.init_weights()
 
-  def get_input_embeddings(self):
-    return self.embeddings.word_embeddings
+    def get_input_embeddings(self):
+        return self.embeddings.word_embeddings
 
-  def set_input_embeddings(self, value):
-    self.embeddings.word_embeddings = value
+    def set_input_embeddings(self, value):
+        self.embeddings.word_embeddings = value
 
 
 @add_start_docstrings(
-  """RoBERTa Model with a `language modeling` head on top. """, ROBERTA_START_DOCSTRING, ROBERTA_INPUTS_DOCSTRING
-)
+    """RoBERTa Model with a `language modeling` head on top. """,
+    ROBERTA_START_DOCSTRING, ROBERTA_INPUTS_DOCSTRING)
 class RobertaForMaskedLM(BertPreTrainedModel):
-  r"""
+    r"""
       **masked_lm_labels**: (`optional`) ``torch.LongTensor`` of shape ``(batch_size, sequence_length)``:
           Labels for computing the masked language modeling loss.
           Indices should be in ``[-100, 0, ..., config.vocab_size]`` (see ``input_ids`` docstring)
@@ -249,72 +262,77 @@ class RobertaForMaskedLM(BertPreTrainedModel):
       loss, prediction_scores = outputs[:2]
 
   """
-  config_class = RobertaConfig
-  pretrained_model_archive_map = ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
-  base_model_prefix = "roberta"
+    config_class = RobertaConfig
+    pretrained_model_archive_map = ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
+    base_model_prefix = "roberta"
 
-  def __init__(self, config):
-    super(RobertaForMaskedLM, self).__init__(config)
+    def __init__(self, config):
+        super(RobertaForMaskedLM, self).__init__(config)
 
-    self.roberta = RobertaModel(config)
-    self.lm_head = RobertaLMHead(config)
+        self.roberta = RobertaModel(config)
+        self.lm_head = RobertaLMHead(config)
 
-    self.init_weights()
+        self.init_weights()
 
-  def get_output_embeddings(self):
-    return self.lm_head.decoder
+    def get_output_embeddings(self):
+        return self.lm_head.decoder
 
-  def forward(
-      self,
-      input_ids=None,
-      attention_mask=None,
-      token_type_ids=None,
-      position_ids=None,
-      head_mask=None,
-      inputs_embeds=None,
-      masked_lm_labels=None,
-  ):
-    outputs = self.roberta(
-        input_ids,
-        attention_mask=attention_mask,
-        token_type_ids=token_type_ids,
-        position_ids=position_ids,
-        head_mask=head_mask,
-        inputs_embeds=inputs_embeds,
-    )
-    sequence_output = outputs[0]
-    prediction_scores = self.lm_head(sequence_output)
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        masked_lm_labels=None,
+    ):
+        outputs = self.roberta(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+        )
+        sequence_output = outputs[0]
+        prediction_scores = self.lm_head(sequence_output)
 
-    outputs = (prediction_scores,) + outputs[2:]  # Add hidden states and attention if they are here
+        outputs = (prediction_scores, ) + outputs[
+            2:]  # Add hidden states and attention if they are here
 
-    if masked_lm_labels is not None:
-      loss_fct = CrossEntropyLoss()
-      masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), masked_lm_labels.view(-1))
-      outputs = (masked_lm_loss,) + outputs
+        if masked_lm_labels is not None:
+            loss_fct = CrossEntropyLoss()
+            masked_lm_loss = loss_fct(
+                prediction_scores.view(-1, self.config.vocab_size),
+                masked_lm_labels.view(-1))
+            outputs = (masked_lm_loss, ) + outputs
 
-    return outputs  # (masked_lm_loss), prediction_scores, (hidden_states), (attentions)
+        return outputs  # (masked_lm_loss), prediction_scores, (hidden_states), (attentions)
 
 
 class RobertaLMHead(nn.Module):
-  """Roberta Head for masked language modeling."""
+    """Roberta Head for masked language modeling."""
+    def __init__(self, config):
+        super(RobertaLMHead, self).__init__()
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.layer_norm = BertLayerNorm(config.hidden_size,
+                                        eps=config.layer_norm_eps)
 
-  def __init__(self, config):
-    super(RobertaLMHead, self).__init__()
-    self.dense = nn.Linear(config.hidden_size, config.hidden_size)
-    self.layer_norm = BertLayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.decoder = nn.Linear(config.hidden_size,
+                                 config.vocab_size,
+                                 bias=False)
+        self.bias = nn.Parameter(torch.zeros(config.vocab_size))
 
-    self.decoder = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
-    self.bias = nn.Parameter(torch.zeros(config.vocab_size))
+    def forward(self, features, **kwargs):
+        x = self.dense(features)
+        x = gelu(x)
+        x = self.layer_norm(x)
 
-  def forward(self, features, **kwargs):
-    x = self.dense(features)
-    x = gelu(x)
-    x = self.layer_norm(x)
+        # project back to size of vocabulary with bias
+        x = self.decoder(x) + self.bias
 
-    # project back to size of vocabulary with bias
-    x = self.decoder(x) + self.bias
-
-    return x
+        return x
 
 
 @add_start_docstrings(
@@ -324,7 +342,7 @@ class RobertaLMHead(nn.Module):
     ROBERTA_INPUTS_DOCSTRING,
 )
 class RobertaForSequenceClassification(BertPreTrainedModel):
-  r"""
+    r"""
       **labels**: (`optional`) ``torch.LongTensor`` of shape ``(batch_size,)``:
           Labels for computing the sequence classification/regression loss.
           Indices should be in ``[0, ..., config.num_labels]``.
@@ -354,50 +372,51 @@ class RobertaForSequenceClassification(BertPreTrainedModel):
       loss, logits = outputs[:2]
 
   """
-  config_class = RobertaConfig
-  pretrained_model_archive_map = ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
-  base_model_prefix = "roberta"
+    config_class = RobertaConfig
+    pretrained_model_archive_map = ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
+    base_model_prefix = "roberta"
 
-  def __init__(self, config):
-    super(RobertaForSequenceClassification, self).__init__(config)
-    self.num_labels = config.num_labels
+    def __init__(self, config):
+        super(RobertaForSequenceClassification, self).__init__(config)
+        self.num_labels = config.num_labels
 
-    self.roberta = RobertaModel(config)
-    self.classifier = RobertaClassificationHead(config)
+        self.roberta = RobertaModel(config)
+        self.classifier = RobertaClassificationHead(config)
 
-  def forward(
-      self,
-      input_ids=None,
-      attention_mask=None,
-      token_type_ids=None,
-      position_ids=None,
-      head_mask=None,
-      inputs_embeds=None,
-      labels=None,
-  ):
-    outputs = self.roberta(
-        input_ids,
-        attention_mask=attention_mask,
-        token_type_ids=token_type_ids,
-        position_ids=position_ids,
-        head_mask=head_mask,
-        inputs_embeds=inputs_embeds,
-    )
-    sequence_output = outputs[0]
-    logits = self.classifier(sequence_output)
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        labels=None,
+    ):
+        outputs = self.roberta(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+        )
+        sequence_output = outputs[0]
+        logits = self.classifier(sequence_output)
 
-    outputs = (logits,) + outputs[2:]
-    if labels is not None:
-      if self.num_labels == 1:
-        #  We are doing regression
-        loss_fct = MSELoss()
-        loss = loss_fct(logits.view(-1), labels.view(-1))
-      else:
-        loss_fct = CrossEntropyLoss()
-        loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
-      outputs = (loss,) + outputs
+        outputs = (logits, ) + outputs[2:]
+        if labels is not None:
+            if self.num_labels == 1:
+                #  We are doing regression
+                loss_fct = MSELoss()
+                loss = loss_fct(logits.view(-1), labels.view(-1))
+            else:
+                loss_fct = CrossEntropyLoss()
+                loss = loss_fct(logits.view(-1, self.num_labels),
+                                labels.view(-1))
+            outputs = (loss, ) + outputs
 
-    return outputs  # (loss), logits, (hidden_states), (attentions)
+        return outputs  # (loss), logits, (hidden_states), (attentions)
 
 
 @add_start_docstrings(
@@ -407,7 +426,7 @@ class RobertaForSequenceClassification(BertPreTrainedModel):
     ROBERTA_INPUTS_DOCSTRING,
 )
 class RobertaForMultipleChoice(BertPreTrainedModel):
-  r"""
+    r"""
   Inputs:
       **input_ids**: ``torch.LongTensor`` of shape ``(batch_size, num_choices, sequence_length)``:
           Indices of input sequence tokens in the vocabulary.
@@ -476,56 +495,62 @@ class RobertaForMultipleChoice(BertPreTrainedModel):
       loss, classification_scores = outputs[:2]
 
   """
-  config_class = RobertaConfig
-  pretrained_model_archive_map = ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
-  base_model_prefix = "roberta"
+    config_class = RobertaConfig
+    pretrained_model_archive_map = ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
+    base_model_prefix = "roberta"
 
-  def __init__(self, config):
-    super(RobertaForMultipleChoice, self).__init__(config)
+    def __init__(self, config):
+        super(RobertaForMultipleChoice, self).__init__(config)
 
-    self.roberta = RobertaModel(config)
-    self.dropout = nn.Dropout(config.hidden_dropout_prob)
-    self.classifier = nn.Linear(config.hidden_size, 1)
+        self.roberta = RobertaModel(config)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, 1)
 
-    self.init_weights()
+        self.init_weights()
 
-  def forward(
-      self,
-      input_ids=None,
-      token_type_ids=None,
-      attention_mask=None,
-      labels=None,
-      position_ids=None,
-      head_mask=None,
-      inputs_embeds=None,
-  ):
-    num_choices = input_ids.shape[1]
+    def forward(
+        self,
+        input_ids=None,
+        token_type_ids=None,
+        attention_mask=None,
+        labels=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+    ):
+        num_choices = input_ids.shape[1]
 
-    flat_input_ids = input_ids.view(-1, input_ids.size(-1))
-    flat_position_ids = position_ids.view(-1, position_ids.size(-1)) if position_ids is not None else None
-    flat_token_type_ids = token_type_ids.view(-1, token_type_ids.size(-1)) if token_type_ids is not None else None
-    flat_attention_mask = attention_mask.view(-1, attention_mask.size(-1)) if attention_mask is not None else None
-    outputs = self.roberta(
-        flat_input_ids,
-        position_ids=flat_position_ids,
-        token_type_ids=flat_token_type_ids,
-        attention_mask=flat_attention_mask,
-        head_mask=head_mask,
-    )
-    pooled_output = outputs[1]
+        flat_input_ids = input_ids.view(-1, input_ids.size(-1))
+        flat_position_ids = position_ids.view(
+            -1, position_ids.size(-1)) if position_ids is not None else None
+        flat_token_type_ids = token_type_ids.view(
+            -1,
+            token_type_ids.size(-1)) if token_type_ids is not None else None
+        flat_attention_mask = attention_mask.view(
+            -1,
+            attention_mask.size(-1)) if attention_mask is not None else None
+        outputs = self.roberta(
+            flat_input_ids,
+            position_ids=flat_position_ids,
+            token_type_ids=flat_token_type_ids,
+            attention_mask=flat_attention_mask,
+            head_mask=head_mask,
+        )
+        pooled_output = outputs[1]
 
-    pooled_output = self.dropout(pooled_output)
-    logits = self.classifier(pooled_output)
-    reshaped_logits = logits.view(-1, num_choices)
+        pooled_output = self.dropout(pooled_output)
+        logits = self.classifier(pooled_output)
+        reshaped_logits = logits.view(-1, num_choices)
 
-    outputs = (reshaped_logits,) + outputs[2:]  # add hidden states and attention if they are here
+        outputs = (reshaped_logits, ) + outputs[
+            2:]  # add hidden states and attention if they are here
 
-    if labels is not None:
-      loss_fct = CrossEntropyLoss()
-      loss = loss_fct(reshaped_logits, labels)
-      outputs = (loss,) + outputs
+        if labels is not None:
+            loss_fct = CrossEntropyLoss()
+            loss = loss_fct(reshaped_logits, labels)
+            outputs = (loss, ) + outputs
 
-    return outputs  # (loss), reshaped_logits, (hidden_states), (attentions)
+        return outputs  # (loss), reshaped_logits, (hidden_states), (attentions)
 
 
 @add_start_docstrings(
@@ -535,7 +560,7 @@ class RobertaForMultipleChoice(BertPreTrainedModel):
     ROBERTA_INPUTS_DOCSTRING,
 )
 class RobertaForTokenClassification(BertPreTrainedModel):
-  r"""
+    r"""
       **labels**: (`optional`) ``torch.LongTensor`` of shape ``(batch_size, sequence_length)``:
           Labels for computing the token classification loss.
           Indices should be in ``[0, ..., config.num_labels - 1]``.
@@ -563,78 +588,79 @@ class RobertaForTokenClassification(BertPreTrainedModel):
       loss, scores = outputs[:2]
 
   """
-  config_class = RobertaConfig
-  pretrained_model_archive_map = ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
-  base_model_prefix = "roberta"
+    config_class = RobertaConfig
+    pretrained_model_archive_map = ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
+    base_model_prefix = "roberta"
 
-  def __init__(self, config):
-    super(RobertaForTokenClassification, self).__init__(config)
-    self.num_labels = config.num_labels
+    def __init__(self, config):
+        super(RobertaForTokenClassification, self).__init__(config)
+        self.num_labels = config.num_labels
 
-    self.roberta = RobertaModel(config)
-    self.dropout = nn.Dropout(config.hidden_dropout_prob)
-    self.classifier = nn.Linear(config.hidden_size, config.num_labels)
+        self.roberta = RobertaModel(config)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
 
-    self.init_weights()
+        self.init_weights()
 
-  def forward(
-      self,
-      input_ids=None,
-      attention_mask=None,
-      token_type_ids=None,
-      position_ids=None,
-      head_mask=None,
-      inputs_embeds=None,
-      labels=None,
-  ):
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        labels=None,
+    ):
 
-    outputs = self.roberta(
-        input_ids,
-        attention_mask=attention_mask,
-        token_type_ids=token_type_ids,
-        position_ids=position_ids,
-        head_mask=head_mask,
-        inputs_embeds=inputs_embeds,
-    )
+        outputs = self.roberta(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+        )
 
-    sequence_output = outputs[0]
+        sequence_output = outputs[0]
 
-    sequence_output = self.dropout(sequence_output)
-    logits = self.classifier(sequence_output)
+        sequence_output = self.dropout(sequence_output)
+        logits = self.classifier(sequence_output)
 
-    outputs = (logits,) + outputs[2:]  # add hidden states and attention if they are here
-    if labels is not None:
-      loss_fct = CrossEntropyLoss()
-      # Only keep active parts of the loss
-      if attention_mask is not None:
-        active_loss = attention_mask.view(-1) == 1
-        active_logits = logits.view(-1, self.num_labels)[active_loss]
-        active_labels = labels.view(-1)[active_loss]
-        loss = loss_fct(active_logits, active_labels)
-      else:
-        loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
-      outputs = (loss,) + outputs
+        outputs = (logits, ) + outputs[
+            2:]  # add hidden states and attention if they are here
+        if labels is not None:
+            loss_fct = CrossEntropyLoss()
+            # Only keep active parts of the loss
+            if attention_mask is not None:
+                active_loss = attention_mask.view(-1) == 1
+                active_logits = logits.view(-1, self.num_labels)[active_loss]
+                active_labels = labels.view(-1)[active_loss]
+                loss = loss_fct(active_logits, active_labels)
+            else:
+                loss = loss_fct(logits.view(-1, self.num_labels),
+                                labels.view(-1))
+            outputs = (loss, ) + outputs
 
-    return outputs  # (loss), scores, (hidden_states), (attentions)
+        return outputs  # (loss), scores, (hidden_states), (attentions)
 
 
 class RobertaClassificationHead(nn.Module):
-  """Head for sentence-level classification tasks."""
+    """Head for sentence-level classification tasks."""
+    def __init__(self, config):
+        super(RobertaClassificationHead, self).__init__()
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.out_proj = nn.Linear(config.hidden_size, config.num_labels)
 
-  def __init__(self, config):
-    super(RobertaClassificationHead, self).__init__()
-    self.dense = nn.Linear(config.hidden_size, config.hidden_size)
-    self.dropout = nn.Dropout(config.hidden_dropout_prob)
-    self.out_proj = nn.Linear(config.hidden_size, config.num_labels)
-
-  def forward(self, features, **kwargs):
-    x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
-    x = self.dropout(x)
-    x = self.dense(x)
-    x = torch.tanh(x)
-    x = self.dropout(x)
-    x = self.out_proj(x)
-    return x
+    def forward(self, features, **kwargs):
+        x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
+        x = self.dropout(x)
+        x = self.dense(x)
+        x = torch.tanh(x)
+        x = self.dropout(x)
+        x = self.out_proj(x)
+        return x
 
 
 @add_start_docstrings(
@@ -644,7 +670,7 @@ class RobertaClassificationHead(nn.Module):
     ROBERTA_INPUTS_DOCSTRING,
 )
 class RobertaForQuestionAnswering(BertPreTrainedModel):
-  r"""
+    r"""
       **start_positions**: (`optional`) ``torch.LongTensor`` of shape ``(batch_size,)``:
           Labels for position (index) of the start of the labelled span for computing the token classification loss.
           Positions are clamped to the length of the sequence (`sequence_length`).
@@ -676,61 +702,64 @@ class RobertaForQuestionAnswering(BertPreTrainedModel):
       all_tokens = tokenizer.convert_ids_to_tokens(input_ids)
       answer = ' '.join(all_tokens[torch.argmax(start_scores) : torch.argmax(end_scores)+1])
   """
-  config_class = RobertaConfig
-  pretrained_model_archive_map = ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
-  base_model_prefix = "roberta"
+    config_class = RobertaConfig
+    pretrained_model_archive_map = ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
+    base_model_prefix = "roberta"
 
-  def __init__(self, config):
-    super(RobertaForQuestionAnswering, self).__init__(config)
-    self.num_labels = config.num_labels
+    def __init__(self, config):
+        super(RobertaForQuestionAnswering, self).__init__(config)
+        self.num_labels = config.num_labels
 
-    self.roberta = RobertaModel(config)
-    self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
+        self.roberta = RobertaModel(config)
+        self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
 
-    self.init_weights()
+        self.init_weights()
 
-  def forward(
-      self,
-      input_ids,
-      attention_mask=None,
-      token_type_ids=None,
-      position_ids=None,
-      head_mask=None,
-      start_positions=None,
-      end_positions=None,
-  ):
-
-    outputs = self.roberta(
+    def forward(
+        self,
         input_ids,
-        attention_mask=attention_mask,
-        token_type_ids=token_type_ids,
-        position_ids=position_ids,
-        head_mask=head_mask,
-    )
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        start_positions=None,
+        end_positions=None,
+    ):
 
-    sequence_output = outputs[0]
+        outputs = self.roberta(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+        )
 
-    logits = self.qa_outputs(sequence_output)
-    start_logits, end_logits = logits.split(1, dim=-1)
-    start_logits = start_logits.squeeze(-1)
-    end_logits = end_logits.squeeze(-1)
+        sequence_output = outputs[0]
 
-    outputs = (start_logits, end_logits,) + outputs[2:]
-    if start_positions is not None and end_positions is not None:
-      # If we are on multi-GPU, split add a dimension
-      if len(start_positions.size()) > 1:
-        start_positions = start_positions.squeeze(-1)
-      if len(end_positions.size()) > 1:
-        end_positions = end_positions.squeeze(-1)
-      # sometimes the start/end positions are outside our model inputs, we ignore these terms
-      ignored_index = start_logits.size(1)
-      start_positions.clamp_(0, ignored_index)
-      end_positions.clamp_(0, ignored_index)
+        logits = self.qa_outputs(sequence_output)
+        start_logits, end_logits = logits.split(1, dim=-1)
+        start_logits = start_logits.squeeze(-1)
+        end_logits = end_logits.squeeze(-1)
 
-      loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
-      start_loss = loss_fct(start_logits, start_positions)
-      end_loss = loss_fct(end_logits, end_positions)
-      total_loss = (start_loss + end_loss) / 2
-      outputs = (total_loss,) + outputs
+        outputs = (
+            start_logits,
+            end_logits,
+        ) + outputs[2:]
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if len(start_positions.size()) > 1:
+                start_positions = start_positions.squeeze(-1)
+            if len(end_positions.size()) > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = start_logits.size(1)
+            start_positions.clamp_(0, ignored_index)
+            end_positions.clamp_(0, ignored_index)
 
-    return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
+            loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+            outputs = (total_loss, ) + outputs
+
+        return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)

@@ -13,6 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# extra
+REPO=$PWD
+MODEL=${1:-bert-base-multilingual-cased}
+TASK=${2:-pawsx}
+GPU=${3:-0}
+DATA_DIR=${4:-"$REPO/download/"}
+OUT_DIR=${5:-"$REPO/outputs-temp/"}
+echo "Fine-tuning $MODEL on $TASK using GPU $GPU"
+echo "Load data from $DATA_DIR, and save models to $OUT_DIR"
+# extra
+
 REPO=$PWD
 MODEL=${1:-bert-base-multilingual-cased}
 GPU=${2:-0}
@@ -47,7 +58,7 @@ fi
 SAVE_DIR="${OUT_DIR}/${TASK}/${MODEL}-LR${LR}-epoch${EPOCH}-MaxLen${MAXL}/"
 mkdir -p $SAVE_DIR
 
-python $PWD/third_party/run_classify.py \
+python3 $PWD/third_party/run_classify.py \
   --model_type $MODEL_TYPE \
   --model_name_or_path $MODEL \
   --train_language en \
@@ -71,5 +82,4 @@ python $PWD/third_party/run_classify.py \
   --log_file 'train.log' \
   --predict_languages $LANGS \
   --save_only_best_checkpoint $LC \
-  --eval_test_set 
-
+  --eval_test_set

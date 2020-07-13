@@ -1,4 +1,5 @@
-# coding=utf-8
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 # Copyright 2019 Facebook AI Research and the HuggingFace Inc. team.
 # Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
 #
@@ -15,46 +16,53 @@
 # limitations under the License.
 """PyTorch XLM-RoBERTa model. """
 
-
 import logging
-
 from transformers.configuration_roberta import RobertaConfig
 from transformers.file_utils import add_start_docstrings
-from roberta import (
-  RobertaForMaskedLM,
-  RobertaForMultipleChoice,
-  RobertaForSequenceClassification,
-  RobertaForTokenClassification,
-  RobertaForQuestionAnswering,
-  RobertaModel,
+from .roberta import (
+    RobertaForMaskedLM,
+    RobertaForMultipleChoice,
+    RobertaForSequenceClassification,
+    RobertaForTokenClassification,
+    RobertaForQuestionAnswering,
+    RobertaModel,
 )
-
-
 logger = logging.getLogger(__name__)
 
-
 XLM_ROBERTA_PRETRAINED_CONFIG_ARCHIVE_MAP = {
-  "xlm-roberta-base": "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-base-config.json",
-  "xlm-roberta-large": "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-config.json",
-  "xlm-roberta-large-finetuned-conll02-dutch": "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-finetuned-conll02-dutch-config.json",
-  "xlm-roberta-large-finetuned-conll02-spanish": "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-finetuned-conll02-spanish-config.json",
-  "xlm-roberta-large-finetuned-conll03-english": "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-finetuned-conll03-english-config.json",
-  "xlm-roberta-large-finetuned-conll03-german": "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-finetuned-conll03-german-config.json",
+    "xlm-roberta-base":
+    "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-base-config.json",
+    "xlm-roberta-large":
+    "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-config.json",
+    "xlm-roberta-large-finetuned-conll02-dutch":
+    "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-finetuned-conll02-dutch-config.json",
+    "xlm-roberta-large-finetuned-conll02-spanish":
+    "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-finetuned-conll02-spanish-config.json",
+    "xlm-roberta-large-finetuned-conll03-english":
+    "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-finetuned-conll03-english-config.json",
+    "xlm-roberta-large-finetuned-conll03-german":
+    "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-finetuned-conll03-german-config.json",
 }
 
 
 class XLMRobertaConfig(RobertaConfig):
-  pretrained_config_archive_map = XLM_ROBERTA_PRETRAINED_CONFIG_ARCHIVE_MAP
+    pretrained_config_archive_map = XLM_ROBERTA_PRETRAINED_CONFIG_ARCHIVE_MAP
+
 
 XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP = {
-  "xlm-roberta-base": "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-base-pytorch_model.bin",
-  "xlm-roberta-large": "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-pytorch_model.bin",
-  "xlm-roberta-large-finetuned-conll02-dutch": "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-finetuned-conll02-dutch-pytorch_model.bin",
-  "xlm-roberta-large-finetuned-conll02-spanish": "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-finetuned-conll02-spanish-pytorch_model.bin",
-  "xlm-roberta-large-finetuned-conll03-english": "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-finetuned-conll03-english-pytorch_model.bin",
-  "xlm-roberta-large-finetuned-conll03-german": "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-finetuned-conll03-german-pytorch_model.bin",
+    "xlm-roberta-base":
+    "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-base-pytorch_model.bin",
+    "xlm-roberta-large":
+    "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-pytorch_model.bin",
+    "xlm-roberta-large-finetuned-conll02-dutch":
+    "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-finetuned-conll02-dutch-pytorch_model.bin",
+    "xlm-roberta-large-finetuned-conll02-spanish":
+    "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-finetuned-conll02-spanish-pytorch_model.bin",
+    "xlm-roberta-large-finetuned-conll03-english":
+    "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-finetuned-conll03-english-pytorch_model.bin",
+    "xlm-roberta-large-finetuned-conll03-german":
+    "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-large-finetuned-conll03-german-pytorch_model.bin",
 }
-
 
 XLM_ROBERTA_START_DOCSTRING = r"""    The XLM-RoBERTa model was proposed in
     `Unsupervised Cross-lingual Representation Learning at Scale`_
@@ -132,7 +140,7 @@ XLM_ROBERTA_INPUTS_DOCSTRING = r"""
     XLM_ROBERTA_INPUTS_DOCSTRING,
 )
 class XLMRobertaModel(RobertaModel):
-  r"""
+    r"""
   Outputs: `Tuple` comprising various elements depending on the configuration (config) and inputs:
       **last_hidden_state**: ``torch.FloatTensor`` of shape ``(batch_size, sequence_length, hidden_size)``
           Sequence of hidden-states at the output of the last layer of the model.
@@ -174,8 +182,8 @@ class XLMRobertaModel(RobertaModel):
       last_hidden_states = outputs[0]  # The last hidden-state is the first element of the output tuple
 
   """
-  config_class = XLMRobertaConfig
-  pretrained_model_archive_map = XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
+    config_class = XLMRobertaConfig
+    pretrained_model_archive_map = XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
 
 
 @add_start_docstrings(
@@ -184,7 +192,7 @@ class XLMRobertaModel(RobertaModel):
     XLM_ROBERTA_INPUTS_DOCSTRING,
 )
 class XLMRobertaForMaskedLM(RobertaForMaskedLM):
-  r"""
+    r"""
       **masked_lm_labels**: (`optional`) ``torch.LongTensor`` of shape ``(batch_size, sequence_length)``:
           Labels for computing the masked language modeling loss.
           Indices should be in ``[-1, 0, ..., config.vocab_size]`` (see ``input_ids`` docstring)
@@ -213,8 +221,8 @@ class XLMRobertaForMaskedLM(RobertaForMaskedLM):
       loss, prediction_scores = outputs[:2]
 
   """
-  config_class = XLMRobertaConfig
-  pretrained_model_archive_map = XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
+    config_class = XLMRobertaConfig
+    pretrained_model_archive_map = XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
 
 
 @add_start_docstrings(
@@ -224,7 +232,7 @@ class XLMRobertaForMaskedLM(RobertaForMaskedLM):
     XLM_ROBERTA_INPUTS_DOCSTRING,
 )
 class XLMRobertaForSequenceClassification(RobertaForSequenceClassification):
-  r"""
+    r"""
       **labels**: (`optional`) ``torch.LongTensor`` of shape ``(batch_size,)``:
           Labels for computing the sequence classification/regression loss.
           Indices should be in ``[0, ..., config.num_labels]``.
@@ -254,8 +262,8 @@ class XLMRobertaForSequenceClassification(RobertaForSequenceClassification):
       loss, logits = outputs[:2]
 
   """
-  config_class = XLMRobertaConfig
-  pretrained_model_archive_map = XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
+    config_class = XLMRobertaConfig
+    pretrained_model_archive_map = XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
 
 
 @add_start_docstrings(
@@ -265,7 +273,7 @@ class XLMRobertaForSequenceClassification(RobertaForSequenceClassification):
     XLM_ROBERTA_INPUTS_DOCSTRING,
 )
 class XLMRobertaForMultipleChoice(RobertaForMultipleChoice):
-  r"""
+    r"""
   Outputs: `Tuple` comprising various elements depending on the configuration (config) and inputs:
       **loss**: (`optional`, returned when ``labels`` is provided) ``torch.FloatTensor`` of shape ``(1,)``:
           Classification loss.
@@ -291,8 +299,8 @@ class XLMRobertaForMultipleChoice(RobertaForMultipleChoice):
       loss, classification_scores = outputs[:2]
 
   """
-  config_class = XLMRobertaConfig
-  pretrained_model_archive_map = XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
+    config_class = XLMRobertaConfig
+    pretrained_model_archive_map = XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
 
 
 @add_start_docstrings(
@@ -302,7 +310,7 @@ class XLMRobertaForMultipleChoice(RobertaForMultipleChoice):
     XLM_ROBERTA_INPUTS_DOCSTRING,
 )
 class XLMRobertaForTokenClassification(RobertaForTokenClassification):
-  r"""
+    r"""
       **labels**: (`optional`) ``torch.LongTensor`` of shape ``(batch_size, sequence_length)``:
           Labels for computing the token classification loss.
           Indices should be in ``[0, ..., config.num_labels - 1]``.
@@ -330,8 +338,9 @@ class XLMRobertaForTokenClassification(RobertaForTokenClassification):
       loss, scores = outputs[:2]
 
   """
-  config_class = XLMRobertaConfig
-  pretrained_model_archive_map = XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
+    config_class = XLMRobertaConfig
+    pretrained_model_archive_map = XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP
+
 
 @add_start_docstrings(
     """XLM-RoBERTa Model with a multiple choice classification head on top (a linear layer on top of
