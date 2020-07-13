@@ -22,7 +22,7 @@ import csv
 
 
 def pawsx_preprocess(args):
-    def _preprocess_one_file(infile):
+    def _preprocess_one_file(infile, outfile):
         data = []
         for i, line in enumerate(open(infile, 'r')):
             if i == 0:
