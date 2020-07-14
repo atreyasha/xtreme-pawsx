@@ -405,6 +405,22 @@ def train(args, train_dataset, model, tokenizer, lang2id=None):
         if args.save_only_best_checkpoint:
             tb_valid.close()
 
+    # Save final model checkpoint at end of training
+    output_dir = os.path.join(args.output_dir, "checkpoint-training-end")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    model_to_save = (model.module if hasattr(model, "module") else model
+                     )  # Take care of distributed/parallel training
+    model_to_save.save_pretrained(output_dir)
+    tokenizer.save_pretrained(output_dir)
+    torch.save(args, os.path.join(output_dir, "training_args.bin"))
+    logger.info("Saving model checkpoint to %s", output_dir)
+    torch.save(optimizer.state_dict(), os.path.join(output_dir,
+                                                    "optimizer.pt"))
+    torch.save(scheduler.state_dict(), os.path.join(output_dir,
+                                                    "scheduler.pt"))
+    logger.info("Saving optimizer and scheduler states to %s", output_dir)
+
     return global_step, tr_loss / global_step, best_score, best_checkpoint
 
 
@@ -973,31 +989,6 @@ def main():
         logger.info(" best checkpoint = {}, best score = {}".format(
             best_checkpoint, best_score))
 
-    # Saving best-practices: if you use defaults names for the model, you can reload it using from_pretrained()
-    if args.do_train and (args.local_rank == -1
-                          or torch.distributed.get_rank()
-                          == 0):
-        # Create output directory if needed
-        output_dir = os.path.join(args.output_dir, "checkpoint-training-end")
-        if not os.path.exists(output_dir) and args.local_rank in [-1, 0]:
-            os.makedirs(output_dir)
-
-        logger.info("Saving model checkpoint to %s", output_dir)
-        # Save a trained model, configuration and tokenizer using `save_pretrained()`.
-        # They can then be reloaded using `from_pretrained()`
-        model_to_save = (model.module if hasattr(model, "module") else model
-                         )  # Take care of distributed/parallel training
-        model_to_save.save_pretrained(output_dir)
-        tokenizer.save_pretrained(output_dir)
-
-        # Good practice: save your training arguments together with the trained model
-        torch.save(args, os.path.join(output_dir, "training_args.bin"))
-
-        # Load a trained model and vocabulary that you have fine-tuned
-        model = model_class.from_pretrained(output_dir)
-        tokenizer = tokenizer_class.from_pretrained(output_dir)
-        model.to(args.device)
-
     # Evaluation
     results = {}
     if args.init_checkpoint:
@@ -1005,7 +996,8 @@ def main():
     elif os.path.exists(os.path.join(args.output_dir, 'checkpoint-best')):
         best_checkpoint = os.path.join(args.output_dir, 'checkpoint-best')
     else:
-        best_checkpoint = os.path.join(args.output_dir, "checkpoint-training-end")
+        best_checkpoint = os.path.join(args.output_dir,
+                                       "checkpoint-training-end")
     best_score = 0
     if args.do_eval and args.local_rank in [-1, 0]:
         tokenizer = tokenizer_class.from_pretrained(
@@ -1066,17 +1058,16 @@ def main():
                 '======= Predict using the model from {} for {}:\n'.format(
                     best_checkpoint, args.test_split))
             for language in args.predict_languages.split(','):
-                output_file = os.path.join(args.output_dir,
-                                           'test-{}.tsv'.format(language))
-                result = evaluate(args,
-                                  model,
-                                  tokenizer,
-                                  split=args.test_split,
-                                  language=language,
-                                  lang2id=lang2id,
-                                  prefix='best_checkpoint',
-                                  output_file=output_file,
-                                  label_list=label_list)
+                result = evaluate(
+                    args,
+                    model,
+                    tokenizer,
+                    split=args.test_split,
+                    language=language,
+                    lang2id=lang2id,
+                    prefix='best_checkpoint',
+                    output_file=None,  # keep it simple
+                    label_list=label_list)
                 writer.write('{}={}\n'.format(language, result['acc']))
                 logger.info('{}={}'.format(language, result['acc']))
                 total += result['num']
@@ -1088,16 +1079,14 @@ def main():
             args.model_name_or_path
             if args.model_name_or_path else best_checkpoint,
             do_lower_case=args.do_lower_case)
-        model = model_class.from_pretrained(args.init_checkpoint)
+        model = model_class.from_pretrained(args.best_checkpoint)
         model.to(args.device)
         output_predict_file = os.path.join(args.output_dir, 'dev_results')
         total = total_correct = 0.0
         with open(output_predict_file, 'w') as writer:
             writer.write('======= Predict using the model from {}:\n'.format(
-                args.init_checkpoint))
+                args.best_checkpoint))
             for language in args.predict_languages.split(','):
-                output_file = os.path.join(args.output_dir,
-                                           'dev-{}.tsv'.format(language))
                 result = evaluate(args,
                                   model,
                                   tokenizer,
@@ -1105,7 +1094,7 @@ def main():
                                   language=language,
                                   lang2id=lang2id,
                                   prefix='best_checkpoint',
-                                  output_file=output_file,
+                                  output_file=None,
                                   label_list=label_list)
                 writer.write('{}={}\n'.format(language, result['acc']))
                 total += result['num']
