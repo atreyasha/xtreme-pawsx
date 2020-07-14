@@ -1056,7 +1056,7 @@ def main():
         model = model_class.from_pretrained(best_checkpoint)
         model.to(args.device)
         output_predict_file = os.path.join(args.output_dir,
-                                           args.test_split + '_f1.txt')
+                                           args.test_split + '_f1')
         total = sum_f1 = 0.0
         with open(output_predict_file, 'a') as writer:
             writer.write(
@@ -1086,7 +1086,7 @@ def main():
             do_lower_case=args.do_lower_case)
         model = model_class.from_pretrained(best_checkpoint)
         model.to(args.device)
-        output_predict_file = os.path.join(args.output_dir, 'dev_f1.txt')
+        output_predict_file = os.path.join(args.output_dir, 'dev_f1')
         total = sum_f1 = 0.0
         with open(output_predict_file, 'w') as writer:
             writer.write('======= Predict using the model from {}:\n'.format(
