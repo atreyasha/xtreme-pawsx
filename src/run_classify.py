@@ -28,7 +28,7 @@ import random
 import glob
 import torch
 import os
-from seqeval.metrics import f1_score, precision_score, recall_score
+from sklearn.metrics import f1_score, precision_score, recall_score
 from tqdm import tqdm, trange
 
 from transformers import (
@@ -75,10 +75,10 @@ def compute_metrics(preds, labels):
     scores = {
         "acc": (preds == labels).mean(),
         "num": len(preds),
-        "correct": (preds == labels).sum()
-        "f1": f1_score(labels, preds)
-        "precision": precision_score(labels, preds)
-        "recall": recall_score(labels, preds)
+        "correct": (preds == labels).sum(),
+        "f1": f1_score(labels, preds, average="macro"),
+        "precision": precision_score(labels, preds, average="macro"),
+        "recall": recall_score(labels, preds, average="macro")
     }
     return scores
 
@@ -1092,15 +1092,16 @@ def main():
             writer.write('======= Predict using the model from {}:\n'.format(
                 best_checkpoint))
             for language in args.predict_languages.split(','):
-                result = evaluate(args,
-                                  model,
-                                  tokenizer,
-                                  split='dev',
-                                  language=language,
-                                  lang2id=lang2id,
-                                  prefix='best_checkpoint',
-                                  output_file=None,  # keep it simple
-                                  label_list=label_list)
+                result = evaluate(
+                    args,
+                    model,
+                    tokenizer,
+                    split='dev',
+                    language=language,
+                    lang2id=lang2id,
+                    prefix='best_checkpoint',
+                    output_file=None,  # keep it simple
+                    label_list=label_list)
                 writer.write('{}={}\n'.format(language, result['f1']))
                 logger.info('{}={}'.format(language, result['f1']))
                 total += 1
