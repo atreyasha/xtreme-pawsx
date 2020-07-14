@@ -15,7 +15,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Finetuning multi-lingual models on XNLI/PAWSX (Bert, XLM, XLMRoberta)."""
+""" Finetuning multi-lingual models on PAWSX (Bert, XLM, XLMRoberta)."""
 
 from ..arg_metav_formatter import arg_metav_formatter
 from torch.utils.data import DataLoader, TensorDataset
@@ -28,6 +28,7 @@ import random
 import glob
 import torch
 import os
+from seqeval.metrics import f1_score, precision_score, recall_score
 from tqdm import tqdm, trange
 
 from transformers import (
@@ -75,6 +76,9 @@ def compute_metrics(preds, labels):
         "acc": (preds == labels).mean(),
         "num": len(preds),
         "correct": (preds == labels).sum()
+        "f1": f1_score(labels, preds)
+        "precision": precision_score(labels, preds)
+        "recall": recall_score(labels, preds)
     }
     return scores
 
@@ -515,6 +519,7 @@ def evaluate(args,
         else:
             raise ValueError("No other `output_mode` for XNLI.")
         result = compute_metrics(preds, out_label_ids)
+        result["loss"] = eval_loss
         results.update(result)
 
         if output_file:
@@ -1051,8 +1056,8 @@ def main():
         model = model_class.from_pretrained(best_checkpoint)
         model.to(args.device)
         output_predict_file = os.path.join(args.output_dir,
-                                           args.test_split + '_results.txt')
-        total = total_correct = 0.0
+                                           args.test_split + '_f1.txt')
+        total = sum_f1 = 0.0
         with open(output_predict_file, 'a') as writer:
             writer.write(
                 '======= Predict using the model from {} for {}:\n'.format(
@@ -1068,24 +1073,24 @@ def main():
                     prefix='best_checkpoint',
                     output_file=None,  # keep it simple
                     label_list=label_list)
-                writer.write('{}={}\n'.format(language, result['acc']))
-                logger.info('{}={}'.format(language, result['acc']))
-                total += result['num']
-                total_correct += result['correct']
-            writer.write('total={}\n'.format(total_correct / total))
+                writer.write('{}={}\n'.format(language, result['f1']))
+                logger.info('{}={}'.format(language, result['f1']))
+                total += 1
+                sum_f1 += result['f1']
+            writer.write('macro_f1={}\n'.format(sum_f1 / total))
 
     if args.do_predict_dev:
         tokenizer = tokenizer_class.from_pretrained(
             args.model_name_or_path
             if args.model_name_or_path else best_checkpoint,
             do_lower_case=args.do_lower_case)
-        model = model_class.from_pretrained(args.best_checkpoint)
+        model = model_class.from_pretrained(best_checkpoint)
         model.to(args.device)
-        output_predict_file = os.path.join(args.output_dir, 'dev_results')
-        total = total_correct = 0.0
+        output_predict_file = os.path.join(args.output_dir, 'dev_f1')
+        total = sum_f1 = 0.0
         with open(output_predict_file, 'w') as writer:
             writer.write('======= Predict using the model from {}:\n'.format(
-                args.best_checkpoint))
+                best_checkpoint))
             for language in args.predict_languages.split(','):
                 result = evaluate(args,
                                   model,
@@ -1094,12 +1099,13 @@ def main():
                                   language=language,
                                   lang2id=lang2id,
                                   prefix='best_checkpoint',
-                                  output_file=None,
+                                  output_file=None,  # keep it simple
                                   label_list=label_list)
-                writer.write('{}={}\n'.format(language, result['acc']))
-                total += result['num']
-                total_correct += result['correct']
-            writer.write('total={}\n'.format(total_correct / total))
+                writer.write('{}={}\n'.format(language, result['f1']))
+                logger.info('{}={}'.format(language, result['f1']))
+                total += 1
+                sum_f1 += result['f1']
+            writer.write('macro_f1={}\n'.format(sum_f1 / total))
     return result
 
 
