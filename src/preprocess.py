@@ -16,6 +16,7 @@
 
 from __future__ import absolute_import, division, print_function
 from ..arg_metav_formatter import arg_metav_formatter
+from glob import glob
 import argparse
 import os
 import csv
@@ -39,13 +40,14 @@ def pawsx_preprocess(args):
 
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
-    split2file = {'train': 'train', 'test': 'test_2k', 'dev': 'dev_2k'}
+    split2file = {'train': 'train*', 'test': 'test_2k', 'dev': 'dev_2k'}
     for lang in ['en', 'de', 'es', 'fr', 'ja', 'ko', 'zh']:
         for split in ['train', 'test', 'dev']:
-            if split == 'train' and lang != 'en':
-                continue
             file = split2file[split]
             infile = os.path.join(args.data_dir, lang, "{}.tsv".format(file))
+            infile = glob(infile)
+            assert len(infile) == 1
+            infile = infile[0]
             outfile = os.path.join(args.output_dir,
                                    "{}-{}.tsv".format(split, lang))
             _preprocess_one_file(infile, outfile)
