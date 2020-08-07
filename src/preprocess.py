@@ -40,7 +40,7 @@ def pawsx_preprocess(args):
 
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
-    split2file = {'train': 'train*', 'test': 'test_2k', 'dev': 'dev_2k'}
+    split2file = {'train': '*train*', 'test': 'test_2k', 'dev': 'dev_2k'}
     for lang in ['en', 'de', 'es', 'fr', 'ja', 'ko', 'zh']:
         for split in ['train', 'test', 'dev']:
             file = split2file[split]
